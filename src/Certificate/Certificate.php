@@ -18,6 +18,35 @@ class Certificate
         $this->contents = $contents;
     }
 
+    function getSubject(){
+
+        $x509 = new X509();
+        $certProperties = $x509->loadX509($this->contents);
+
+        return $certProperties['tbsCertificate']['subject'];
+    }
+
+    public function getExtension($name){
+        $x509 = new X509();
+        $certProperties = $x509->loadX509($this->contents);
+
+        foreach ($certProperties['tbsCertificate']['extensions'] as $extension) {
+            if ($extension['extnId'] == $name){
+                return $extension['extnValue'];
+            }
+        }
+
+    }
+
+    function isSigned($caPath){
+        $x509 = new X509();
+        $x509->loadX509($this->contents);
+        foreach(glob($caPath) as $ca) {
+            $x509->loadCA(file_get_contents($ca));
+        }
+        return $x509->validateSignature();
+    }
+
     /**
      * Get the URL of the parent certificate.
      *
@@ -25,16 +54,9 @@ class Certificate
      */
     public function getParentCertificateURL()
     {
-        $x509 = new X509();
-        $certProperties = $x509->loadX509($this->contents);
-
-        foreach ($certProperties['tbsCertificate']['extensions'] as $extension) {
-            if ($extension['extnId'] == 'id-pe-authorityInfoAccess') {
-                foreach ($extension['extnValue'] as $extnValue) {
-                    if ($extnValue['accessMethod'] == 'id-ad-caIssuers') {
-                        return $extnValue['accessLocation']['uniformResourceIdentifier'];
-                    }
-                }
+        foreach ($this->getExtension('id-pe-authorityInfoAccess') as $extnValue) {
+            if ($extnValue['accessMethod'] == 'id-ad-caIssuers') {
+                return $extnValue['accessLocation']['uniformResourceIdentifier'];
             }
         }
 
